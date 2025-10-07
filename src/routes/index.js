@@ -14,16 +14,15 @@ const toggleUser = require("../controllers/toggleUser");
 const addUserData = require("../controllers/addUserData");
 const getUserData = require("../controllers/getUserData");
 const findAllUsers = require("../controllers/findAllUsers");
-const findAllCards = require("../controllers/findAllCards");
 const getCardsFiltered = require("../controllers/getCardsFiltered");
-const getCardById = require("../controllers/getCardById");
+const getCardById = require("../controllers/getCardsById");
 const createCard = require("../controllers/createCard");
 const updateCard = require("../controllers/updateCard");
 const deleteCard = require("../controllers/deleteCard");
-
 const auth = require("../middlewares/authMiddleware");
 const role = require("../middlewares/roleMiddleware");
 const isAdmin = require("../middlewares/isAdmin");
+const findAllCards = require("../controllers/findAllCard");
 
 // 🔐 Autenticación
 router.post("/api/signin", signIn);
@@ -42,6 +41,7 @@ router.post("/add-user-data", auth, addUserData);
 router.get("/get-user-data", auth, getUserData);
 
 // 📦 Cards
+router.get("/cards/all", auth, findAllCards)
 router.get("/cards", auth, getCardsFiltered); // protegida con token
 router.get("/cards/:id", auth, getCardById);
 router.post("/cards", auth, role(["editor", "admin"]), createCard);

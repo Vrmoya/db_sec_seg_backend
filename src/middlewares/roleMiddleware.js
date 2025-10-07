@@ -1,12 +1,23 @@
-const roleMiddleware = (roles = []) => {
+const roleMiddleware = (allowedRoles = []) => {
   return (req, res, next) => {
-    if (!req.user) return res.status(401).json({ message: "No autenticado" });
+    // Verificar que el usuario esté autenticado
+    if (!req.user) {
+      return res.status(401).json({ message: "No autenticado. Token requerido." });
+    }
 
-    if (req.user.isAdmin || roles.includes(req.user.role)) {
+    // Verificar que el usuario tenga un rol válido
+    const userRole = req.user.role;
+    if (!userRole || typeof userRole !== "string") {
+      return res.status(403).json({ message: "Rol no definido o inválido." });
+    }
+
+    // Permitir acceso si el usuario es admin o tiene un rol permitido
+    if (req.user.isAdmin || allowedRoles.includes(userRole)) {
       return next();
     }
 
-    return res.status(403).json({ message: "No autorizado" });
+    // Si no tiene permisos, denegar acceso
+    return res.status(403).json({ message: "No tenés permiso para acceder a esta ruta." });
   };
 };
 

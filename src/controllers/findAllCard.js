@@ -7,7 +7,7 @@ const findAllCards = async (req, res) => {
     // Si querés formatear los datos antes de enviarlos:
     const formattedCards = cardsFromDB.map((card) => ({
       ...card.toJSON(),
-      api: false, // Por si querés mantener consistencia con el modelo de Pokemon
+      api: false, // Por si querés mantener consistencia con el modelo de Card
     }));
 
     return res.status(200).json(formattedCards);

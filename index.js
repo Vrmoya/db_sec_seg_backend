@@ -9,6 +9,6 @@ conn.sync({ force: false }).then(() => {
   console.log("DATABASE CONNECTED")
   server.listen(PORT, () => {
     console.log(PORT + ` PORT SUCCESS`);
-    
+   
   });
 });

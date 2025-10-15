@@ -1,6 +1,10 @@
 const { Router } = require("express");
 const router = Router();
 
+const fs = require('fs');
+const path = require('path');
+
+
 const {
   signIn,
   signUp,
@@ -67,7 +71,7 @@ router.post(
 );
 
 router.put("/cards/:id", auth, role(["editor", "admin"]), updateCard);
-router.delete("/cards/:id", auth, isAdmin, deleteCard);
+router.delete("/cards/:id", auth, role(['admin']), deleteCard);
 
 // 📤 Subida de imágenes asociadas a cards
 router.post(
@@ -103,26 +107,42 @@ router.post(
     }
   }
 );
+router.delete('/cards/:cardId/images/:imageId', authMiddleware, role(['admin', 'editor']), async (req, res) => {
+  const cardId = parseInt(req.params.cardId);
+  const imageId = parseInt(req.params.imageId);
 
-// 📚 Historial por dominio
-router.get(
-  "/cards/dominio/:dominio",
-  auth,
-  role(["viewer", "editor", "admin"]),
-  async (req, res) => {
-    try {
-      const { dominio } = req.params;
-      const cards = await Card.findAll({
-        where: { dominio },
-        order: [["fecha", "DESC"]],
-      });
+  console.log('🧼 Intentando eliminar imagen:', imageId, 'de card:', cardId);
+  console.log('🔍 Tipos:', typeof cardId, typeof imageId);
 
-      res.json(cards);
-    } catch (err) {
-      res.status(500).json({ error: err.message });
+  try {
+    const image = await CardImage.findOne({
+      where: { id: imageId, cardId }
+    });
+
+    if (!image) {
+      console.warn('⚠️ No se encontró imagen con ID:', imageId, 'para card:', cardId);
+      return res.status(404).json({ error: 'Imagen no encontrada' });
     }
+
+    const imagePath = path.join(__dirname, '..', 'public', image.url);
+    if (fs.existsSync(imagePath)) {
+      fs.unlinkSync(imagePath);
+      console.log('🗑️ Archivo eliminado del sistema:', imagePath);
+    } else {
+      console.warn('📁 Archivo físico no encontrado:', imagePath);
+    }
+
+    await image.destroy();
+    console.log('✅ Imagen eliminada de la base de datos:', imageId);
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('❌ Error al eliminar imagen:', err);
+    res.status(500).json({ error: 'Error interno al eliminar imagen' });
   }
-);
+});
+
+
 //Validacion
 
 router.post("/cards/validate/:id", auth, role(["editor", "admin"]), validateBlock);

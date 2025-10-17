@@ -1,9 +1,8 @@
 const { Router } = require("express");
 const router = Router();
 
-const fs = require('fs');
-const path = require('path');
-
+const fs = require("fs");
+const path = require("path");
 
 const {
   signIn,
@@ -35,8 +34,8 @@ const { Card, CardImage } = require("../db");
 const validateBlock = require("../controllers/validateBlock");
 const getCardsStats = require("../controllers/getCardsStats");
 
-const authMiddleware = require('../middlewares/authMiddleware');
-const updateUserRole = require('../controllers/updateUserRole');
+const authMiddleware = require("../middlewares/authMiddleware");
+const updateUserRole = require("../controllers/updateUserRole");
 
 // 🔐 Autenticación
 router.post("/api/signin", signIn);
@@ -54,12 +53,20 @@ router.post("/user", auth, isAdmin, toggleUser);
 router.post("/add-user-data", auth, addUserData);
 router.get("/get-user-data", auth, getUserData);
 
-
-router.put('/users/:id/role', authMiddleware, role(['admin']), updateUserRole);
+router.put("/users/:id/role", authMiddleware, role(["admin"]), updateUserRole);
 
 // 📦 Cards
 router.get("/cards/all", auth, findAllCards);
-router.get("/cards", auth, role(["viewer", "editor", "admin"]), getCardsFiltered);
+router.get(
+  "/cards",
+  auth,
+  role(["viewer", "editor", "admin"]),
+  getCardsFiltered
+);
+
+// ✅ Esta ruta debe ir antes que /cards/:id
+router.get("/cards/stats", authMiddleware, isAdmin, getCardsStats);
+
 router.get("/cards/:id", auth, getCardById);
 
 router.post(
@@ -71,7 +78,7 @@ router.post(
 );
 
 router.put("/cards/:id", auth, role(["editor", "admin"]), updateCard);
-router.delete("/cards/:id", auth, role(['admin']), deleteCard);
+router.delete("/cards/:id", auth, role(["admin"]), deleteCard);
 
 // 📤 Subida de imágenes asociadas a cards
 router.post(
@@ -107,45 +114,75 @@ router.post(
     }
   }
 );
-router.delete('/cards/:cardId/images/:imageId', authMiddleware, role(['admin', 'editor']), async (req, res) => {
-  const cardId = parseInt(req.params.cardId);
-  const imageId = parseInt(req.params.imageId);
 
-  console.log('🧼 Intentando eliminar imagen:', imageId, 'de card:', cardId);
-  console.log('🔍 Tipos:', typeof cardId, typeof imageId);
+router.delete(
+  "/cards/:cardId/images/:imageId",
+  authMiddleware,
+  role(["admin", "editor"]),
+  async (req, res) => {
+    const cardId = parseInt(req.params.cardId);
+    const imageId = parseInt(req.params.imageId);
 
+    console.log("🧼 Intentando eliminar imagen:", imageId, "de card:", cardId);
+    console.log("🔍 Tipos:", typeof cardId, typeof imageId);
+
+    try {
+      const image = await CardImage.findOne({
+        where: { id: imageId, cardId },
+      });
+
+      if (!image) {
+        console.warn(
+          "⚠️ No se encontró imagen con ID:",
+          imageId,
+          "para card:",
+          cardId
+        );
+        return res.status(404).json({ error: "Imagen no encontrada" });
+      }
+
+      const imagePath = path.join(__dirname, "..", "public", image.url);
+      if (fs.existsSync(imagePath)) {
+        fs.unlinkSync(imagePath);
+        console.log("🗑️ Archivo eliminado del sistema:", imagePath);
+      } else {
+        console.warn("📁 Archivo físico no encontrado:", imagePath);
+      }
+
+      await image.destroy();
+      console.log("✅ Imagen eliminada de la base de datos:", imageId);
+
+      res.json({ success: true });
+    } catch (err) {
+      console.error("❌ Error al eliminar imagen:", err);
+      res.status(500).json({ error: "Error interno al eliminar imagen" });
+    }
+  }
+);
+
+router.get("/cards/historial/:dominio", authMiddleware, async (req, res) => {
   try {
-    const image = await CardImage.findOne({
-      where: { id: imageId, cardId }
-    });
+    const { dominio } = req.params;
+    const cards = await Card.findAll({ where: { dominio } });
 
-    if (!image) {
-      console.warn('⚠️ No se encontró imagen con ID:', imageId, 'para card:', cardId);
-      return res.status(404).json({ error: 'Imagen no encontrada' });
+    if (!cards || cards.length === 0) {
+      return res
+        .status(404)
+        .json({ error: "No se encontraron registros para ese dominio" });
     }
 
-    const imagePath = path.join(__dirname, '..', 'public', image.url);
-    if (fs.existsSync(imagePath)) {
-      fs.unlinkSync(imagePath);
-      console.log('🗑️ Archivo eliminado del sistema:', imagePath);
-    } else {
-      console.warn('📁 Archivo físico no encontrado:', imagePath);
-    }
-
-    await image.destroy();
-    console.log('✅ Imagen eliminada de la base de datos:', imageId);
-
-    res.json({ success: true });
+    res.json(cards);
   } catch (err) {
-    console.error('❌ Error al eliminar imagen:', err);
-    res.status(500).json({ error: 'Error interno al eliminar imagen' });
+    console.error("Error al obtener historial por dominio:", err);
+    res.status(500).json({ error: "Error interno del servidor" });
   }
 });
 
-
-//Validacion
-
-router.post("/cards/validate/:id", auth, role(["editor", "admin"]), validateBlock);
-router.get('/cards/stats', authMiddleware, role(["admin"]), getCardsStats);
-
+// Validación
+router.post(
+  "/cards/validate/:id",
+  auth,
+  role(["editor", "admin"]),
+  validateBlock
+);
 module.exports = router;
